@@ -1,0 +1,44 @@
+---
+- name: Deploy new cluster in GKE
+  hosts: localhost
+
+  tasks:
+  - name: create network
+    google.cloud.gcp_compute_network:
+      name: "network-{{ cluster_name }}"
+      auto_create_subnetworks: 'true'
+      project: "{{ project_id }}"
+      state: present
+      auth_kind: "{{ auth_kind }}"
+      service_account_file: "{{ sa_file }}"
+    register: network
+
+  - name: create cluster
+    google.cloud.gcp_container_cluster:
+      name: "{{ cluster_name }}"
+      initial_node_count: "{{ initial_node_count }}"
+      location: "{{ location }}"
+      network: "network-{{ cluster_name }}"
+      network_policy:
+        enabled: true
+        provider: "CALICO"
+      project: "{{ project_id }}"
+      state: present
+      auth_kind: "{{ auth_kind }}"
+      service_account_file: "{{ sa_file }}"
+    register: cluster
+
+  - name: create nodes
+    google.cloud.gcp_container_node_pool:
+      name: "node-pool-{{ cluster_name }}"
+      initial_node_count: "{{ initial_node_count }}"
+      cluster: "{{ cluster }}"
+      config:
+        disk_size_gb: "{{ disk_size_gb }}"
+        disk_type: "{{ disk_type }}"
+        machine_type: "{{ machine_type }}"
+      location: "{{ location }}"
+      project: "{{ project_id }}"
+      state: present
+      auth_kind: "{{ auth_kind }}"
+      service_account_file: "{{ sa_file }}"

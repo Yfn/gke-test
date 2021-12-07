@@ -1,0 +1,8 @@
+plugin: gcp_compute
+projects:
+  - ex-test-334405
+#service_account_file: /home/roman/Dropbox/ex-test-334405-a7c597ca8d13.json
+#auth_kind: serviceaccount
+scopes:
+  - 'https://www.googleapis.com/auth/cloud-platform'
+  - 'https://www.googleapis.com/auth/compute.readonly'
