@@ -1,0 +1,216 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ex-test-gke-nginxconf
+  labels:
+    app: ex-test-gke
+    deployment: ex-test-gke-deployment
+  namespace: default
+data:
+  config : |
+    server {
+      index index.php index.html;
+      error_log  /var/log/nginx/error.log;
+      access_log /var/log/nginx/access.log;
+      root /var/www/app;
+
+      location / {
+          try_files $uri $uri/ /index.php?$query_string;
+      }
+
+      location ~ .php$ {
+          try_files $uri =404;
+          fastcgi_split_path_info ^(.+.php)(/.+)$;
+          fastcgi_pass localhost:9000;
+          fastcgi_index index.php;
+          include fastcgi_params;
+          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          fastcgi_param PATH_INFO $fastcgi_path_info;
+      }
+    }
+---
+# Source: ex-test-gke/templates/php-conf.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ex-test-gke-phpconf
+  labels:
+    app: ex-test-gke
+    deployment: ex-test-gke-deployment
+  namespace: default
+data:
+  www.conf: |
+    [www]
+
+    user = www
+    group = www
+
+    listen=9000
+    listen.owner = www
+    listen.group = www
+    listen.mode = 0660
+
+    pm = static
+    pm.max_children = 20
+    pm.start_servers = 10
+    pm.min_spare_servers = 10
+    pm.max_spare_servers = 10
+    pm.max_requests = 500
+    pm.status_path = /status
+    catch_workers_output = yes
+    decorate_workers_output = no
+    clear_env = no
+    php_admin_flag[log_errors] = True
+    php_flag[display_errors] = on
+---
+# Source: ex-test-gke/templates/svc-nginx.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ex-test-gke
+  labels:
+    app: ex-test-gke
+    deployment: ex-test-gke-deployment
+  namespace: default
+spec:
+  ports:
+    - name: http
+      targetPort: http
+      protocol: TCP
+      port: 80
+  selector:
+    app: ex-test-gke
+    deployment: ex-test-gke-deployment
+---
+# Source: ex-test-gke/templates/deploy.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ex-test-gke-app
+  labels:
+    app: ex-test-gke
+    deployment: ex-test-gke-deployment
+  namespace: default
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 20%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ex-test-gke
+      deployment: ex-test-gke-deployment
+  template:
+    metadata:
+      labels:
+        app: ex-test-gke
+        deployment: ex-test-gke-deployment
+    spec:
+      containers:
+      - name: ex-test-gke-fpm
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh","-c","/bin/sleep 12; /bin/kill -QUIT 1"]
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        image: docker.io/chefmaester/ex-test-gke:latest
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: fpm-dst
+          mountPath: /etc/php-fpm.d
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 256Mi
+          requests:
+            cpu: 500m
+            memory: 256Mi
+        readinessProbe:
+          failureThreshold: 10
+          exec:
+            command: [/php-fpm-healthcheck]
+          initialDelaySeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          failureThreshold: 10
+          exec:
+            command: [/php-fpm-healthcheck]
+          initialDelaySeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+      - name: ex-test-gke-nginx
+        image: nginx:latest
+        imagePullPolicy: Always
+#        securityContext:
+#          runAsUser: www
+#          runAsGroup: www
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh","-c","/bin/sleep 10; /bin/kill -QUIT 1"]
+        env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBE_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: var-cache-nginx-run
+          mountPath: /var/cache/nginx
+        - name: var-cache-nginx-run
+          mountPath: /var/run
+        - name: config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        readinessProbe:
+          failureThreshold: 8640
+          httpGet:
+            path: /health/check
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: var-cache-nginx-run
+          emptyDir:
+            medium: "Memory"
+        - name: fpm-dst
+          configMap:
+            name: ex-test-gke-phpconf
+        - name: config
+          configMap:
+            name: ex-test-gke-nginxconf
+            items:
+            - key: config
+              path: site.conf

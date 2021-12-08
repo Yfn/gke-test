@@ -1,6 +1,7 @@
 FROM php:7.3-fpm-alpine3.10
 
-ARG WD=/app
+ARG WD=/var/www/app
+WORKDIR $WD
 
 RUN apk update && apk add --no-cache \
     mc \
@@ -8,10 +9,9 @@ RUN apk update && apk add --no-cache \
     php-mbstring \
     php-curl \
     composer \
-    && composer require pecee/simple-router
+    && composer require pecee/simple-router --working-dir=$WD
 
-WORKDIR /var/www/testapp
-
-COPY  .php $WD/
+COPY  *.php $WD/
+COPY  *.conf /etc/nginx/conf.d/
 
 CMD ["php-fpm"]

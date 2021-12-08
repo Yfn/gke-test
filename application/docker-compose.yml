@@ -1,0 +1,34 @@
+version: "3.6"
+
+networks:
+  inner:
+
+services:
+
+  nginx:
+    container_name: ex-test.nginx
+    image: nginx:latest
+    depends_on:
+      - php-fpm
+    links:
+      - php-fpm
+    volumes:
+      - app:/var/www/app
+      - nginxconf:/etc/nginx/conf.d
+    restart: unless-stopped
+    networks:
+      - inner
+    ports:
+      - "17080:80"
+  php-fpm:
+    container_name: ex-test.php-fpm
+    image: docker.io/chefmaester/ex-test-gke:latest
+    restart: unless-stopped
+    networks:
+      - inner
+    volumes:
+      - app:/var/www/app
+      - nginxconf:/etc/nginx/conf.d
+volumes:
+  app:
+  nginxconf:
