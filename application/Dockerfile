@@ -1,10 +1,9 @@
-FROM php:7.4-fpm-alpine
+FROM php:7.3-fpm-alpine
 
 ARG WD=/var/www/app
 WORKDIR $WD
 
 RUN apk update && apk add --no-cache \
-    mc \
     php-json \
     php-mbstring \
     php-curl \

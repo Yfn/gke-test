@@ -20,6 +20,7 @@ services:
       - inner
     ports:
       - "17080:80"
+
   php-fpm:
     container_name: ex-test.php-fpm
     image: docker.io/chefmaester/ex-test-gke:latest
@@ -29,6 +30,10 @@ services:
     volumes:
       - app:/var/www/app
       - nginxconf:/etc/nginx/conf.d
+    build:
+      context: .
+      dockerfile: Dockerfile
+
 volumes:
   app:
   nginxconf:
