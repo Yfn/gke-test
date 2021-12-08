@@ -10,7 +10,7 @@ RUN apk update && apk add --no-cache \
     composer \
     && composer require pecee/simple-router --working-dir=$WD
 
-COPY  *.php $WD/
-COPY  *.conf /etc/nginx/conf.d/
+COPY *.php  $WD/
+COPY *.conf /etc/nginx/conf.d/
 
 CMD ["php-fpm"]
