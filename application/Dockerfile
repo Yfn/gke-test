@@ -1,4 +1,4 @@
-FROM php:7.3-fpm-alpine3.10
+FROM php:7.4-fpm-alpine
 
 ARG WD=/var/www/app
 WORKDIR $WD
