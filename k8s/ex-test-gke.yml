@@ -73,12 +73,15 @@ metadata:
     app: ex-test-gke
     deployment: ex-test-gke-deployment
   namespace: default
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
   ports:
     - name: http
       targetPort: http
       protocol: TCP
       port: 80
+  type: LoadBalancer
   selector:
     app: ex-test-gke
     deployment: ex-test-gke-deployment
@@ -132,27 +135,11 @@ spec:
           mountPath: /etc/php-fpm.d
         resources:
           limits:
-            cpu: 1000m
-            memory: 256Mi
+            cpu: 100m
+            memory: 128Mi
           requests:
-            cpu: 500m
-            memory: 256Mi
-        readinessProbe:
-          failureThreshold: 10
-          exec:
-            command: [/php-fpm-healthcheck]
-          initialDelaySeconds: 1
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 2
-        livenessProbe:
-          failureThreshold: 10
-          exec:
-            command: [/php-fpm-healthcheck]
-          initialDelaySeconds: 1
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 2
+            cpu: 50m
+            memory: 128Mi
       - name: ex-test-gke-nginx
         image: nginx:latest
         imagePullPolicy: Always
@@ -174,7 +161,7 @@ spec:
               fieldPath: status.hostIP
         ports:
         - name: http
-          containerPort: 8080
+          containerPort: 80
           protocol: TCP
         volumeMounts:
         - name: var-cache-nginx-run
@@ -185,16 +172,16 @@ spec:
           mountPath: /etc/nginx/conf.d
         resources:
           limits:
-            cpu: 500m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 10m
+            memory: 64Mi
         readinessProbe:
           failureThreshold: 8640
           httpGet:
-            path: /health/check
-            port: 8080
+            path: /
+            port: 80
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -213,4 +200,4 @@ spec:
             name: ex-test-gke-nginxconf
             items:
             - key: config
-              path: site.conf
+              path: default.conf
