@@ -1,0 +1,22 @@
+---
+- name: Remove cluster from GKE
+  hosts: localhost
+
+  tasks:
+
+  - name: remove cluster
+    google.cloud.gcp_container_cluster:
+      name: "{{ cluster_name }}"
+      location: "{{ location }}"
+      project: "{{ project_id }}"
+      auth_kind: "{{ auth_kind }}"
+      service_account_file: "{{ sa_file }}"
+      state: absent
+  - name: remove network
+    google.cloud.gcp_compute_network:
+      name: network-{{ cluster_name }}
+      auto_create_subnetworks: 'true'
+      project: "{{ project_id }}"
+      auth_kind: "{{ auth_kind }}"
+      service_account_file: "{{ sa_file }}"
+      state: absent

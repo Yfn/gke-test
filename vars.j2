@@ -1,0 +1,11 @@
+cluster_name: {{ cluster_name }}
+project_id: {{ project_id }}
+namespace: 'default'
+location: {{ zone }}
+region: {{ region }}
+initial_node_count: 1
+disk_size_gb: 20
+disk_type: pd-standard
+machine_type: n1-standard-1
+sa_file: {{ auth_file }}
+auth_kind: serviceaccount

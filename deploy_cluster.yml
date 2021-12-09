@@ -21,7 +21,7 @@
       network: "network-{{ cluster_name }}"
       network_policy:
         enabled: true
-        provider: "CALICO"
+        provider: "calico"
       project: "{{ project_id }}"
       state: present
       auth_kind: "{{ auth_kind }}"

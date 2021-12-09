@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ex-test-gke-nginxconf
+  name: {{ cluster_name }}-nginxconf
   labels:
-    app: ex-test-gke
-    deployment: ex-test-gke-deployment
+    app: {{ cluster_name }}
+    deployment: {{ cluster_name }}-deployment
   namespace: default
 data:
   config : |
@@ -30,48 +30,14 @@ data:
       }
     }
 ---
-# Source: ex-test-gke/templates/php-conf.yml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ex-test-gke-phpconf
-  labels:
-    app: ex-test-gke
-    deployment: ex-test-gke-deployment
-  namespace: default
-data:
-  www.conf: |
-    [www]
-
-    user = www
-    group = www
-
-    listen=9000
-    listen.owner = www
-    listen.group = www
-    listen.mode = 0660
-
-    pm = static
-    pm.max_children = 20
-    pm.start_servers = 10
-    pm.min_spare_servers = 10
-    pm.max_spare_servers = 10
-    pm.max_requests = 500
-    pm.status_path = /status
-    catch_workers_output = yes
-    decorate_workers_output = no
-    clear_env = no
-    php_admin_flag[log_errors] = True
-    php_flag[display_errors] = on
----
-# Source: ex-test-gke/templates/svc-nginx.yml
+# Source: {{ cluster_name }}/templates/svc-nginx.yml
 apiVersion: v1
 kind: Service
 metadata:
-  name: ex-test-gke
+  name: {{ cluster_name }}
   labels:
-    app: ex-test-gke
-    deployment: ex-test-gke-deployment
+    app: {{ cluster_name }}
+    deployment: {{ cluster_name }}-deployment
   namespace: default
   annotations:
     cloud.google.com/neg: '{"ingress": true}'
@@ -83,17 +49,17 @@ spec:
       port: 80
   type: LoadBalancer
   selector:
-    app: ex-test-gke
-    deployment: ex-test-gke-deployment
+    app: {{ cluster_name }}
+    deployment: {{ cluster_name }}-deployment
 ---
-# Source: ex-test-gke/templates/deploy.yml
+# Source: {{ cluster_name }}/templates/deploy.yml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ex-test-gke-app
+  name: {{ cluster_name }}-app
   labels:
-    app: ex-test-gke
-    deployment: ex-test-gke-deployment
+    app: {{ cluster_name }}
+    deployment: {{ cluster_name }}-deployment
   namespace: default
 spec:
   replicas: 3
@@ -105,16 +71,17 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: ex-test-gke
-      deployment: ex-test-gke-deployment
+      app: {{ cluster_name }}
+      deployment: {{ cluster_name }}-deployment
   template:
     metadata:
       labels:
-        app: ex-test-gke
-        deployment: ex-test-gke-deployment
+        app: {{ cluster_name }}
+        deployment: {{ cluster_name }}-deployment
     spec:
       containers:
-      - name: ex-test-gke-fpm
+### PHP-FPM container
+      - name: {{ cluster_name }}-fpm
         lifecycle:
           preStop:
             exec:
@@ -130,9 +97,6 @@ spec:
               fieldPath: status.hostIP
         image: docker.io/chefmaester/ex-test-gke:latest
         imagePullPolicy: Always
-        volumeMounts:
-        - name: fpm-dst
-          mountPath: /etc/php-fpm.d
         resources:
           limits:
             cpu: 100m
@@ -140,12 +104,10 @@ spec:
           requests:
             cpu: 50m
             memory: 128Mi
-      - name: ex-test-gke-nginx
+### Nginx container
+      - name: {{ cluster_name }}-nginx
         image: nginx:latest
         imagePullPolicy: Always
-#        securityContext:
-#          runAsUser: www
-#          runAsGroup: www
         lifecycle:
           preStop:
             exec:
@@ -170,6 +132,8 @@ spec:
           mountPath: /var/run
         - name: config
           mountPath: /etc/nginx/conf.d
+        - name: appdata
+          mountPath: /var/www/app
         resources:
           limits:
             cpu: 50m
@@ -180,24 +144,33 @@ spec:
         readinessProbe:
           failureThreshold: 8640
           httpGet:
-            path: /
+            path: /health/check
             port: 80
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 2
+### Startup container
+      initContainers:
+      - name: appdata
+        image: docker.io/chefmaester/ex-test-gke:latest
+        command: [sh, -c]
+        args: ["cp -r /var/www/app/* /data"]
+        imagePullPolicy: Always
+        volumeMounts:
+          - mountPath: /data
+            name: appdata
       terminationGracePeriodSeconds: 30
       volumes:
         - name: var-cache-nginx-run
           emptyDir:
             medium: "Memory"
-        - name: fpm-dst
-          configMap:
-            name: ex-test-gke-phpconf
         - name: config
           configMap:
-            name: ex-test-gke-nginxconf
+            name: {{ cluster_name }}-nginxconf
             items:
             - key: config
               path: default.conf
+        - name: appdata
+          emptyDir: {}
